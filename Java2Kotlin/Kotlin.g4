@@ -1,17 +1,20 @@
 grammar Kotlin;
 
 //PARSING RULES
-start : pre topLevel*;
+start : pre topLevel* end;
 
 topLevel : method | classDeclare | COMMENT;
-
+end : ;
 //METHOD
-method : modifier? FUN methodName parameters (COLON dataType returnTypeCheck?)? (body | implicitBody);
+method : modifier? FUN methodName parameters (COLON dataType returnTypeCheck?)? (body | implicitBody) methodEnd;
+methodEnd : ;
+
 //method rules
 body : LEFTCURLY block RIGHTCURLY;
 implicitBody : ASSNEQUAL elseBody; 
 elseBody : (assn | expr | declaration | COMMENT | returnStmt | breakStmt | methodCall | objCall)+;
 block : (assn | expr | declaration | COMMENT | returnStmt | breakStmt | method)+;
+forBlock : (assn | declaration | method)+;
 breakStmt : BREAK;//method eliminated from block
 returnTypeCheck : '?';
 
@@ -25,15 +28,17 @@ assn : (VAL|VAR) varName COLON dataType methodCall? ASSNEQUAL (num | methodCall 
 	| varName assnOperator (num | methodCall) 
 	| (VAL|VAR) varName ASSNEQUAL (num | methodCall | paramOperations) 
 	| varName assnOperator (varName | paramOperations)
-	| (VAL | VAR) varName ASSNEQUAL (LISTOF | SETOF) LEFTROUND listElem RIGHTROUND
+	| (VAL | VAR) varName ASSNEQUAL (LISTOF | SETOF) LEFTROUND listElem RIGHTROUND assnEnd
 	| variable
 	| modifier? (VAL | VAR) methodName COLON dataType methodCall ASSNEQUAL (varName | objCall | methodCall | booleanExpr)
 	;//check this. declaring and then RE-ASSIGNING
 
+assnEnd : ;
+
 //IMPORT	
 pre : ((PACKAGE | IMPORT) string)*;
 
-listElem : STRINGTRY (COMMA STRINGTRY)* | varName (COMMA varName)*;
+listElem : stringy (COMMA stringy)* | varName (COMMA varName)*;
 //assnFuncValue : call 
 
 
@@ -52,13 +57,22 @@ booleanExpr : (varName | objCall | methodCall) compareOperator (varName | objCal
 //WHEN EXPRESSION
 whenExpr : whenSwitch | whenList;
 whenList : WHEN LEFTCURLY (STRINGTRY IN varName '->' block)* RIGHTCURLY;
-whenSwitch : WHEN LEFTROUND varName RIGHTROUND LEFTCURLY (whenBody)* RIGHTCURLY;
+whenSwitch : WHEN LEFTROUND varName RIGHTROUND LEFTCURLY (whenBody)* RIGHTCURLY whenEnd;
+whenEnd : ;
+
+
+
 whenBody : (num | STRINGTRY | IS (dataType | string*) | NOT_IS (dataType | string*) | ELSE)  '->' whenBodyResult;
-whenBodyResult : STRINGTRY | num;
+whenBodyResult : STRINGTRY | num | returnStmt;
 
 
 //LOOP EXPRESSION
-forLoop : FOR LEFTROUND (forCondition | forRange) RIGHTROUND LEFTCURLY (block)? RIGHTCURLY;
+//forLoop : FOR LEFTROUND (forCondition | forRange) RIGHTROUND LEFTCURLY (block)? RIGHTCURLY forEnd;
+forLoop : FOR LEFTROUND (forCondition | forRange) RIGHTROUND LEFTCURLY (forBlock)? RIGHTCURLY forEnd;
+
+
+forEnd : ;
+
 forCondition : (varName | objCall) IN (varName | objCall);
 forRange : variable IN num ('..' | DOWNTO) num (STEP num)? | ;
 whileLoop : WHILE LEFTROUND whileCondition RIGHTROUND LEFTCURLY (block)? RIGHTCURLY;
@@ -117,13 +131,21 @@ classConstructorParam : varName | methodCall | objCall;
 //DECLARATION
 //METHODCALL
 declaration : methodCall | objCall | methodDeclare | variableDeclare;//methodDeclaration is different from method. no curly brackets
-methodCall : (methodName | LISTOF) LEFTROUND methodCallBody RIGHTROUND;//CAN I USE THE SAME RULE?
 
-methodCallBody : callParam | many | | paramOperations?;
+
+methodCall : methodName LEFTROUND callBodyStart methodCallBody callBodyEnd RIGHTROUND methodCallEnd
+	| LISTOF manyString
+;//CAN I USE THE SAME RULE?
+manyString : stringy (COMMA stringy)*;
+methodCallEnd : ;
+callBodyStart : ;
+callBodyEnd : ;
+
+methodCallBody : callParam | stringy | | paramOperations | many?;
 many : (STRINGTRY | methodCall)(COMMA (STRINGTRY | methodCall))*;
 methodDeclare : modifier? FUN methodName LEFTROUND RIGHTROUND COLON dataType;
 variableDeclare : (VAL | VAR) varName COLON dataType;
-
+stringy : STRINGTRY;
 
 //OPERATIONS
 paramOperations : LEFTROUND? paramOperationLayer RIGHTROUND?;
@@ -136,7 +158,7 @@ simpleOperators : PLUS | MINUS | DIV | MUL;
 
 
 //RETURN
-returnStmt : RETURN (variable | NULL | objCall)?;
+returnStmt : RETURN (variable | NULL | objCall | STRINGTRY)?;
 
 variable : (DPLUS | DMINUS)? (ID | num | '_' | NULL)+ (DPLUS | DMINUS)?;
 dataType : ID | NULL;
